@@ -296,7 +296,13 @@ impl<'a> PrebootApiController<'a> {
             )),
             InsertBlockDevice(config) => self.insert_block_device(config),
             InsertNetworkDevice(config) => self.insert_net_device(config),
-            LoadSnapshot(config) => self.load_snapshot(&config),
+            LoadSnapshot(config) => {
+                let now = std::time::Instant::now();
+                let res = self.load_snapshot(&config);
+                let new_now = std::time::Instant::now();
+                println!("Snapshot Load Time: {:?} us", new_now.duration_since(now).as_micros());
+                res
+            },
             SetBalloonDevice(config) => self.set_balloon_device(config),
             SetVsockDevice(config) => self.set_vsock_device(config),
             SetVmConfiguration(config) => self.set_vm_config(config),
@@ -415,7 +421,11 @@ impl<'a> PrebootApiController<'a> {
         )
         .and_then(|vmm| {
             let ret = if load_params.resume_vm {
-                vmm.lock().expect("Poisoned lock").resume_vm()
+                let now = std::time::Instant::now();
+                let res = vmm.lock().expect("Poisoned lock").resume_vm();
+                let new_now = std::time::Instant::now();
+                println!("Resume VM: {:?} us", new_now.duration_since(now).as_micros());
+                res
             } else {
                 Ok(())
             };

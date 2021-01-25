@@ -353,24 +353,35 @@ pub fn restore_from_snapshot(
 ) -> std::result::Result<Arc<Mutex<Vmm>>, LoadSnapshotError> {
     use self::LoadSnapshotError::*;
     let track_dirty_pages = params.enable_diff_snapshots;
+
+    let now = std::time::Instant::now();
     let microvm_state = snapshot_state_from_file(&params.snapshot_path, version_map)?;
+    let new_now = std::time::Instant::now();
+    println!("Snapshot State from File: {:?} us", new_now.duration_since(now).as_micros());
 
     // Some sanity checks before building the microvm.
     snapshot_state_sanity_check(&microvm_state)?;
-
+    let now = std::time::Instant::now();
     let guest_memory = guest_memory_from_file(
         &params.mem_file_path,
         &microvm_state.memory_state,
         track_dirty_pages,
     )?;
-    builder::build_microvm_from_snapshot(
+    let new_now = std::time::Instant::now();
+    println!("Snapshot Memory from File: {:?} us", new_now.duration_since(now).as_micros());
+
+    let now = std::time::Instant::now();
+    let res = builder::build_microvm_from_snapshot(
         event_manager,
         microvm_state,
         guest_memory,
         track_dirty_pages,
         seccomp_filter,
     )
-    .map_err(BuildMicroVm)
+    .map_err(BuildMicroVm);
+    let new_now = std::time::Instant::now();
+    println!("Build Microvm from Snapshot: {:?} us", new_now.duration_since(now).as_micros());
+    res
 }
 
 fn snapshot_state_from_file(
@@ -383,7 +394,11 @@ fn snapshot_state_from_file(
     let mut snapshot_reader = File::open(snapshot_path).map_err(SnapshotBackingFile)?;
     let metadata = std::fs::metadata(snapshot_path).map_err(SnapshotBackingFileMetadata)?;
     let snapshot_len = metadata.len() as usize;
-    Snapshot::load(&mut snapshot_reader, snapshot_len, version_map).map_err(DeserializeMicrovmState)
+    let now = std::time::Instant::now();
+    let res = Snapshot::load(&mut snapshot_reader, snapshot_len, version_map).map_err(DeserializeMicrovmState);
+    let new_now = std::time::Instant::now();
+    println!("snapshot_state_from_file::Load: {:?} us", new_now.duration_since(now).as_micros());
+    res
 }
 
 fn guest_memory_from_file(

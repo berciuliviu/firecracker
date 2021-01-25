@@ -309,6 +309,8 @@ impl<'a> Persist<'a> for MMIODeviceManager {
         };
 
         if let Some(balloon_state) = &state.balloon_device {
+            let now = std::time::Instant::now();
+
             let device = Arc::new(Mutex::new(
                 Balloon::restore(
                     BalloonConstructorArgs { mem: mem.clone() },
@@ -325,8 +327,11 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 &balloon_state.mmio_slot,
                 constructor_args.event_manager,
             )?;
+            let new_now = std::time::Instant::now();
+            println!("Balloon Device Restore: {:?} us", new_now.duration_since(now).as_micros());
         }
 
+        let now = std::time::Instant::now();
         for block_state in &state.block_devices {
             let device = Arc::new(Mutex::new(
                 Block::restore(
@@ -345,6 +350,10 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 constructor_args.event_manager,
             )?;
         }
+        let new_now = std::time::Instant::now();
+        println!("Block Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
+
+        let now = std::time::Instant::now();
         for net_state in &state.net_devices {
             let device = Arc::new(Mutex::new(
                 Net::restore(
@@ -363,6 +372,9 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 constructor_args.event_manager,
             )?;
         }
+        let new_now = std::time::Instant::now();
+        println!("Net Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
+
         if let Some(vsock_state) = &state.vsock_device {
             let ctor_args = VsockUdsConstructorArgs {
                 cid: vsock_state.device_state.frontend.cid,
