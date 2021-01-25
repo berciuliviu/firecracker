@@ -52,7 +52,8 @@ class MicrovmBuilder:
               config: Artifact,
               net_ifaces=None,
               enable_diff_snapshots=False,
-              cpu_template=None):
+              cpu_template=None,
+              vcpu_count=1, mem_size_mib=128):
         """Build a fresh microvm."""
         vm = init_microvm(self.root_path, self.bin_cloner_path,
                           self._fc_binary, self._jailer_binary)
@@ -97,8 +98,8 @@ class MicrovmBuilder:
 
         # Apply the microvm artifact configuration and template.
         response = vm.machine_cfg.put(
-            vcpu_count=int(microvm_config['vcpu_count']),
-            mem_size_mib=int(microvm_config['mem_size_mib']),
+            vcpu_count=int(vcpu_count),
+            mem_size_mib=int(mem_size_mib),
             ht_enabled=bool(microvm_config['ht_enabled']),
             track_dirty_pages=enable_diff_snapshots,
             cpu_template=cpu_template,

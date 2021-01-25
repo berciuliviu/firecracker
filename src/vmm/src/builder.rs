@@ -29,6 +29,7 @@ use devices::legacy::Serial;
 use devices::virtio::{Balloon, Block, MmioTransport, Net, VirtioDevice, Vsock, VsockUnixBackend};
 use kernel::cmdline::Cmdline as KernelCmdline;
 use logger::warn;
+use logger::info;
 use polly::event_manager::{Error as EventManagerError, EventManager, Subscriber};
 use seccomp::{BpfProgramRef, SeccompFilter};
 use snapshot::Persist;
@@ -390,6 +391,7 @@ pub fn build_microvm_from_snapshot(
         .map_err(|_| MicrovmStateError::InvalidInput)
         .map_err(RestoreMicrovmState)?;
 
+    let now = std::time::Instant::now();
     // Build Vmm.
     let (mut vmm, vcpus) = create_vmm_and_vcpus(
         event_manager,
@@ -397,6 +399,8 @@ pub fn build_microvm_from_snapshot(
         track_dirty_pages,
         vcpu_count,
     )?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- Create-Vmm-Vcpus-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
 
     #[cfg(target_arch = "aarch64")]
     {
@@ -408,12 +412,15 @@ pub fn build_microvm_from_snapshot(
             .map_err(RestoreMicrovmState)?;
     }
 
+    let now = std::time::Instant::now();
     // Restore kvm vm state.
     #[cfg(target_arch = "x86_64")]
     vmm.vm
         .restore_state(&microvm_state.vm_state)
         .map_err(MicrovmStateError::RestoreVmState)
         .map_err(RestoreMicrovmState)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- KVM-State-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
 
     // Restore devices states.
     let mmio_ctor_args = MMIODevManagerConstructorArgs {
@@ -421,18 +428,27 @@ pub fn build_microvm_from_snapshot(
         vm: vmm.vm.fd(),
         event_manager,
     };
+    let now = std::time::Instant::now();
     vmm.mmio_device_manager =
         MMIODeviceManager::restore(mmio_ctor_args, &microvm_state.device_states)
             .map_err(MicrovmStateError::RestoreDevices)
             .map_err(RestoreMicrovmState)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- MMIO-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
 
-    // Move vcpus to their own threads and start their state machine in the 'Paused' state.
+    let now = std::time::Instant::now();
     vmm.start_vcpus(vcpus, seccomp_filter)
         .map_err(StartMicrovmError::Internal)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- VCPUs-Start {:?} -&%-", new_now.duration_since(now).as_micros());
+    // Move vcpus to their own threads and start their state machine in the 'Paused' state.
 
+    let now = std::time::Instant::now();
     // Restore vcpus kvm state.
     vmm.restore_vcpu_states(microvm_state.vcpu_states)
-        .map_err(RestoreMicrovmState)?;
+    .map_err(RestoreMicrovmState)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- VCPUs-State-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
 
     let vmm = Arc::new(Mutex::new(vmm));
     event_manager

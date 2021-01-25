@@ -185,6 +185,9 @@ def pytest_addoption(parser):
     For some reason, pytest doesn't properly pick up this hook in our plugin
     class, so we need to call it from here.
     """
+    parser.addoption("--vcpu_cnt", action="store", default="1")
+    parser.addoption("--mem_size", action="store", default="128")
+
     return PytestScheduler.instance().do_pytest_addoption(parser)
 
 
@@ -441,6 +444,14 @@ def pytest_generate_tests(metafunc):
     For each parameter from the list (i.e. tuple) a different test case
     scenario will be created.
     """
+    option_value = metafunc.config.option.vcpu_cnt
+    if 'vcpu_cnt' in metafunc.fixturenames and option_value is not None:
+        metafunc.parametrize("vcpu_cnt", [option_value])
+
+    option_value = metafunc.config.option.mem_size
+    if 'mem_size' in metafunc.fixturenames and option_value is not None:
+        metafunc.parametrize("mem_size", [option_value])
+
     if 'context' in metafunc.fixturenames:
         # In order to create the params for the current fixture, we need the
         # capability and the number of vms we want to spawn.

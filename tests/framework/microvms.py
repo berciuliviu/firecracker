@@ -56,7 +56,8 @@ class VMBase:
     def from_artifacts(cls, bin_cloner_path, config,
                        kernel, disks, cpu_template, start=False,
                        fc_binary=None, jailer_binary=None,
-                       net_ifaces=None, enable_diff_snapshots=False):
+                       net_ifaces=None, enable_diff_snapshots=False,
+                       vcpu_count=1, mem_size_mib=128):
         """Spawns a new Firecracker and applies specified config."""
         artifacts = ArtifactCollection(_test_images_s3_bucket())
         # Pick the first artifact in the set.
@@ -85,7 +86,8 @@ class VMBase:
                                   config=config,
                                   cpu_template=cpu_template,
                                   net_ifaces=net_ifaces,
-                                  enable_diff_snapshots=enable_diff_snapshots)
+                                  enable_diff_snapshots=enable_diff_snapshots,
+                                  vcpu_count=vcpu_count, mem_size_mib=mem_size_mib)
 
         if start:
             basevm.start()
@@ -104,7 +106,8 @@ class VMNano(VMBase):
     @classmethod
     def spawn(cls, bin_cloner_path, start=False,
               fc_binary=None, jailer_binary=None,
-              net_ifaces=None, diff_snapshots=False):
+              net_ifaces=None, diff_snapshots=False,
+              vcpu_count=2, mem_size_mib=256):
         """Spawns and optionally starts the vm."""
         return VMBase.from_artifacts(bin_cloner_path,
                                      "2vcpu_256mb",
@@ -115,7 +118,9 @@ class VMNano(VMBase):
                                      fc_binary,
                                      jailer_binary,
                                      net_ifaces=net_ifaces,
-                                     enable_diff_snapshots=diff_snapshots)
+                                     enable_diff_snapshots=diff_snapshots,
+                                     vcpu_count=vcpu_count,
+                                     mem_size_mib=mem_size_mib)
 
 
 class VMMicro(VMBase):

@@ -1,0 +1,10 @@
+{
+ "Create-Vmm-Vcpus-Restore": [],
+ "KVM-State-Restore": [],
+ "Block-Devices-Restore": [],
+ "Net-Devices-Restore": [],
+ "MMIO-Devices-Restore": [],
+ "VCPUs-Start": [],
+ "VCPUs-State-Restore": [],
+ "TOTAL-Snapshot-Load-Time": []
+}

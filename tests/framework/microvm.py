@@ -166,6 +166,7 @@ class Microvm:
             self._cpu_load_monitor.join()
             self._cpu_load_monitor.check_samples()
 
+
     @property
     def api_session(self):
         """Return the api session associated with this microVM."""
@@ -728,6 +729,7 @@ class Microvm:
         """
         assert mem_file_path is not None, "Please specify mem_file_path."
         assert snapshot_path is not None, "Please specify snapshot_path."
+        LOG.info("Mem file path is: {}".format(mem_file_path))
 
         response = self.vm.patch(state='Paused')
         assert self.api_session.is_status_no_content(response.status_code)
@@ -736,6 +738,7 @@ class Microvm:
                                         snapshot_path=snapshot_path,
                                         diff=diff,
                                         version=version)
+        LOG.info("status code is {}".format(response.status_code))
         assert self.api_session.is_status_no_content(response.status_code)
 
     def start_console_logger(self, log_fifo):
