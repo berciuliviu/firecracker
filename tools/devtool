@@ -118,6 +118,9 @@ CTR_MICROVM_IMAGES_DIR="$CTR_FC_BUILD_DIR/img"
 # These options are not command-specific, so we store them as global vars
 OPT_UNATTENDED=false
 
+DEFAULT_TEST_SESSION_ROOT_PATH=/srv
+DEFAULT_RAMDISK_PATH=/mnt/devtool-ramdisk
+
 
 # Send a decorated message to stdout, followed by a new line
 #
@@ -189,6 +192,38 @@ ensure_docker() {
         "https://docs.docker.com/install/linux/linux-postinstall/"
 }
 
+# Run a command and retry multiple times if it fails. Once it stops
+# failing return to normal execution. If there are "retry count" 
+# failures, set the last error code.
+# $1 - command
+# $2 - retry count
+# $3 - sleep interval between retries
+retry_cmd() {
+    command=$1
+    retry_cnt=$2
+    sleep_int=$3
+
+    {
+        $command
+    } || {
+        # Save error code
+        err_code=$?
+
+        # Command failed, substract one from retry_cnt
+        retry_cnt=$((retry_cnt - 1))
+
+        # If retry_cnt is larger than 0, sleep and call again
+        if [ "$retry_cnt" -gt 0 ]; then
+            echo "$command failed, retrying..."
+            sleep "$sleep_int"
+            retry_cmd "$command" "$retry_cnt" "$sleep_int"
+        fi
+
+        # Set what error code docker returned
+        $(exit "$err_code")
+    }
+}
+
 # Attempt to download our Docker image. Exit if that fails.
 # Upon returning from this call, the caller can be certain our Docker image is
 # available on this system.
@@ -204,7 +239,9 @@ ensure_devctr() {
         say "About to pull docker image $DEVCTR_IMAGE"
         get_user_confirmation || die "Aborted."
 
-        docker pull "${DEVCTR_IMAGE}"
+        # Run docker pull 5 times in case it fails - sleep 3 seconds
+        # between attempts
+        retry_cmd "docker pull $DEVCTR_IMAGE" 5 3
 
         ok_or_die "Error pulling docker image. Aborting."
     }
@@ -436,6 +473,11 @@ cmd_help() {
     echo "        will be passed through to pytest."
     echo "        -c, --cpuset-cpus cpulist    Set a dedicated cpulist to be used by the tests."
     echo "        -m, --cpuset-mems memlist    Set a dedicated memlist to be used by the tests."
+    echo "        -r, --ramdisk size[k|m|g]    Use a ramdisk of `size` MB for
+                                               the entire test session (e.g
+                                               stored artifacts, Firecracker
+                                               binaries, logs/metrics FIFOs
+                                               and test created device files)."
     echo ""
     echo "    checkenv"
     echo "        Performs prerequisites checks needed to execute firecracker."
@@ -593,6 +635,21 @@ cmd_strip() {
     return $ret
 }
 
+mount_ramdisk() {
+    say "Using ramdisk ..."
+    local ramdisk_size="$1"
+    umount_ramdisk
+    mkdir -p ${DEFAULT_RAMDISK_PATH} && \
+    mount -t tmpfs -o size=${ramdisk_size} tmpfs ${DEFAULT_RAMDISK_PATH}
+    mkdir -p ${DEFAULT_RAMDISK_PATH}/srv
+    mkdir -p  ${DEFAULT_RAMDISK_PATH}/tmp
+}
+
+umount_ramdisk() {
+    umount ${DEFAULT_RAMDISK_PATH} &>/dev/null
+    rmdir ${DEFAULT_RAMDISK_PATH} &>/dev/null
+}
+
 # `$0 test` - run integration tests
 # Please see `$0 help` for more information.
 #
@@ -609,6 +666,11 @@ cmd_test() {
             "-m"|"--cpuset-mems")
                 shift
                 local cpuset_mems="$1"
+                ;;
+            "-r"|"--ramdisk")
+                shift
+                local ramdisk_size="$1"
+                local ramdisk=true
                 ;;
             "--")               { shift; break;     } ;;
             *)
@@ -627,6 +689,11 @@ cmd_test() {
     say "$(date -u +'%F %H:%M:%S %Z')"
     say "Starting test run ..."
 
+    if [[ $ramdisk = true ]]; then
+        mount_ramdisk ${ramdisk_size}
+        ramdisk_args="--volume ${DEFAULT_RAMDISK_PATH}:${DEFAULT_TEST_SESSION_ROOT_PATH}"
+    fi
+
     # Testing (running Firecracker via the jailer) needs root access,
     # in order to set-up the Firecracker jail (manipulating cgroups, net
     # namespaces, etc).
@@ -639,10 +706,16 @@ cmd_test() {
         --workdir "$CTR_FC_ROOT_DIR/tests" \
         --cpuset-cpus="$cpuset_cpus" \
         --cpuset-mems="$cpuset_mems" \
+        ${ramdisk_args} \
         -- \
         pytest "$@"
 
     ret=$?
+
+
+    if [[ $ramdisk = true ]]; then
+        umount_ramdisk
+    fi
 
     # Running as root would have created some root-owned files under the build
     # dir. Let's fix that.
@@ -664,6 +737,12 @@ cmd_shell() {
         case "$1" in
             "-h"|"--help")          { cmd_help; exit 1; } ;;
             "-p"|"--privileged")    { privileged=true;  } ;;
+            "-r"|"--ramdisk")
+                  shift
+                  local ramdisk_size="$1"
+                  local ramdisk=true
+                  ;;
+              "--")               { shift; break;     } ;;
             *)
                 die "Unknown argument: $1. Please use --help for help."
             ;;
@@ -674,6 +753,11 @@ cmd_shell() {
     # Make sure we have what we need to continue.
     ensure_devctr
     ensure_build_dir
+
+    if [[ $ramdisk = true ]]; then
+        mount_ramdisk ${ramdisk_size}
+        ramdisk_args="--volume ${DEFAULT_RAMDISK_PATH}:${DEFAULT_TEST_SESSION_ROOT_PATH}"
+    fi
 
     if [[ $privileged = true ]]; then
         # If requested, spin up a privileged container.
@@ -687,6 +771,7 @@ cmd_shell() {
             --ulimit nofile=4096:4096 \
             --security-opt seccomp=unconfined \
             --workdir "$CTR_FC_ROOT_DIR" \
+            ${ramdisk_args} \
             -- \
             bash
         ret=$?
@@ -715,6 +800,10 @@ cmd_shell() {
             -- \
             bash --norc
         ret=$?
+    fi
+
+    if [[ $ramdisk = true ]]; then
+        umount_ramdisk
     fi
 
     return $ret
