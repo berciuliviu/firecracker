@@ -7,6 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from conftest import init_microvm
+from framework.defs import DEFAULT_TEST_SESSION_ROOT_PATH
 from framework.artifacts import (
     Artifact, DiskArtifact, Snapshot, SnapshotType, NetIfaceConfig
 )
@@ -43,7 +44,9 @@ class MicrovmBuilder:
 
     def init_root_path(self):
         """Initialize microvm root path."""
-        self._root_path = tempfile.mkdtemp(MicrovmBuilder.ROOT_PREFIX)
+        self._root_path = tempfile.mkdtemp(
+            prefix=MicrovmBuilder.ROOT_PREFIX,
+            dir=f"{DEFAULT_TEST_SESSION_ROOT_PATH}")
 
     def build(self,
               kernel: Artifact,
@@ -52,7 +55,8 @@ class MicrovmBuilder:
               config: Artifact,
               net_ifaces=None,
               enable_diff_snapshots=False,
-              cpu_template=None):
+              cpu_template=None,
+              vcpu_count=1, mem_size_mib=128):
         """Build a fresh microvm."""
         vm = init_microvm(self.root_path, self.bin_cloner_path,
                           self._fc_binary, self._jailer_binary)
@@ -97,8 +101,8 @@ class MicrovmBuilder:
 
         # Apply the microvm artifact configuration and template.
         response = vm.machine_cfg.put(
-            vcpu_count=int(microvm_config['vcpu_count']),
-            mem_size_mib=int(microvm_config['mem_size_mib']),
+            vcpu_count=int(vcpu_count),
+            mem_size_mib=int(mem_size_mib),
             ht_enabled=bool(microvm_config['ht_enabled']),
             track_dirty_pages=enable_diff_snapshots,
             cpu_template=cpu_template,

@@ -47,7 +47,7 @@ class Microvm:
     process.
     """
 
-    SCREEN_LOGFILE = "/tmp/screen.log"
+    SCREEN_LOGFILE = "/tmp/screen-{}.log"
 
     def __init__(
         self,
@@ -82,6 +82,7 @@ class Microvm:
             exec_file=self._fc_binary_path,
         )
         self.jailer_clone_pid = None
+        self._screen_log = None
 
         # Copy the /etc/localtime file in the jailer root
         self.jailer.copy_into_root(
@@ -165,6 +166,7 @@ class Microvm:
             self._cpu_load_monitor.signal_stop()
             self._cpu_load_monitor.join()
             self._cpu_load_monitor.check_samples()
+
 
     @property
     def api_session(self):
@@ -359,6 +361,11 @@ class Microvm:
         os.makedirs(self._fsfiles_path, exist_ok=True)
 
     @property
+    def screen_log(self):
+        """Get the screen log file."""
+        return self._screen_log
+
+    @property
     def vcpus_count(self):
         """Get the vcpus count."""
         return self._vcpus_count
@@ -445,19 +452,16 @@ class Microvm:
         if self._jailer.daemonize:
             self.daemonize_jailer(jailer_param_list)
         else:
-            # Delete old screen log if any.
-            try:
-                os.unlink(self.SCREEN_LOGFILE)
-            except OSError:
-                pass
-            # Log screen output to SCREEN_LOGFILE
             # This file will collect any output from 'screen'ed Firecracker.
+            self._screen_log = self.SCREEN_LOGFILE.format(self._session_name)
             start_cmd = 'screen -L -Logfile {logfile} '\
-                        '-dmS {session} {binary} {params}'.format(
-                            logfile=self.SCREEN_LOGFILE,
-                            session=self._session_name,
-                            binary=self._jailer_binary_path,
-                            params=' '.join(jailer_param_list))
+                        '-dmS {session} {binary} {params}'
+            start_cmd = start_cmd.format(
+                logfile=self.screen_log,
+                session=self._session_name,
+                binary=self._jailer_binary_path,
+                params=' '.join(jailer_param_list)
+            )
 
             utils.run_cmd(start_cmd)
 
@@ -509,7 +513,7 @@ class Microvm:
 
     def serial_input(self, input_string):
         """Send a string to the Firecracker serial console via screen."""
-        input_cmd = 'screen -S {session} -p 0 -X stuff "{input_string}^M"'
+        input_cmd = 'screen -S {session} -p 0 -X stuff "{input_string}"'
         utils.run_cmd(input_cmd.format(session=self._session_name,
                                        input_string=input_string))
 
@@ -728,6 +732,7 @@ class Microvm:
         """
         assert mem_file_path is not None, "Please specify mem_file_path."
         assert snapshot_path is not None, "Please specify snapshot_path."
+        LOG.info("Mem file path is: {}".format(mem_file_path))
 
         response = self.vm.patch(state='Paused')
         assert self.api_session.is_status_no_content(response.status_code)
@@ -736,6 +741,7 @@ class Microvm:
                                         snapshot_path=snapshot_path,
                                         diff=diff,
                                         version=version)
+        LOG.info("status code is {}".format(response.status_code))
         assert self.api_session.is_status_no_content(response.status_code)
 
     def start_console_logger(self, log_fifo):
@@ -783,7 +789,7 @@ class Serial:
             # serial already opened
             return
 
-        screen_log_fd = os.open(Microvm.SCREEN_LOGFILE, os.O_RDONLY)
+        screen_log_fd = os.open(self._vm.screen_log, os.O_RDONLY)
         self._poller = select.poll()
         self._poller.register(screen_log_fd,
                               select.POLLIN | select.POLLHUP)

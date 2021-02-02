@@ -300,7 +300,7 @@ impl<'a> PrebootApiController<'a> {
                 let now = std::time::Instant::now();
                 let res = self.load_snapshot(&config);
                 let new_now = std::time::Instant::now();
-                println!("Snapshot Load Time: {:?} us", new_now.duration_since(now).as_micros());
+                info!("-&%- TOTAL-Snapshot-Load-Time {:?} -&%-", new_now.duration_since(now).as_micros());
                 res
             },
             SetBalloonDevice(config) => self.set_balloon_device(config),
@@ -424,7 +424,11 @@ impl<'a> PrebootApiController<'a> {
                 let now = std::time::Instant::now();
                 let res = vmm.lock().expect("Poisoned lock").resume_vm();
                 let new_now = std::time::Instant::now();
+<<<<<<< HEAD
                 println!("Resume VM: {:?} us", new_now.duration_since(now).as_micros());
+=======
+                info!("Resume VM: {:?} us", new_now.duration_since(now).as_micros());
+>>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
                 res
             } else {
                 Ok(())

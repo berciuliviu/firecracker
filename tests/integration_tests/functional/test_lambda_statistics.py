@@ -1,6 +1,8 @@
 import logging
 import platform
 import tempfile
+import json
+import os
 import pytest
 from test_balloon import _test_rss_memory_lower, copy_util_to_rootfs
 from conftest import _test_images_s3_bucket
@@ -12,7 +14,7 @@ import host_tools.network as net_tools  # pylint: disable=import-error
 import host_tools.drive as drive_tools
 
 
-# Define 4 net device configurations.
+# Define 2 net device configurations.
 net_ifaces = [NetIfaceConfig(),
               NetIfaceConfig(host_ip="192.168.1.1",
                              guest_ip="192.168.1.2",
@@ -20,22 +22,39 @@ net_ifaces = [NetIfaceConfig(),
                              dev_name="eth1")
             ]
 
-# Define 4 scratch drives.
-scratch_drives = ["vdb", "vdc", "vdd", "vde"]
+# Define 3 scratch drives.
+scratch_drives = ["vdb", "vdc", "vdd"]
 
-def create_snapshot_helper(test_microvm_with_api, logger,
-                           vcpu_count=1, mem_size_mib=128,
+def create_snapshot_helper(bin_cloner_path, logger, target_version=None,
                            drives=None, ifaces=None,
-                           ):
+                           vcpu_count = 1, mem_size_mib = 128,
+                           fc_binary=None, jailer_binary=None,
+                           balloon=False, diff_snapshots=False):
     """Create a snapshot with many devices."""
-    vm_instance = test_microvm_with_api
-    vm_instance.spawn()
-
-    vm_instance.basic_config(vcpu_count=vcpu_count,
-                    mem_size_mib=mem_size_mib)
+    vm_instance = VMNano.spawn(bin_cloner_path, False,
+                               fc_binary, jailer_binary,
+                               net_ifaces=ifaces,
+                               diff_snapshots=diff_snapshots,
+                               vcpu_count=vcpu_count, mem_size_mib=mem_size_mib)
     vm = vm_instance.vm
 
-    snapshot_type = SnapshotType.FULL
+    if diff_snapshots is False:
+        snapshot_type = SnapshotType.FULL
+    else:
+        # Version 0.24 and greater has Diff and ballon support.
+        snapshot_type = SnapshotType.DIFF
+
+    if balloon:
+        # Copy balloon test util.
+        copy_util_to_rootfs(vm_instance.disks[0].local_path(), 'fillmem')
+
+        # Add a memory balloon with stats enabled.
+        response = vm.balloon.put(
+            amount_mb=0,
+            deflate_on_oom=True,
+            stats_polling_interval_s=1
+        )
+        assert vm.api_session.is_status_no_content(response.status_code)
 
     # Disk path array needed when creating the snapshot later.
     disks = [vm_instance.disks[0].local_path()]
@@ -88,13 +107,36 @@ def create_snapshot_helper(test_microvm_with_api, logger,
                                        target_version=target_version,
                                        snapshot_type=snapshot_type,
                                        net_ifaces=net_ifaces)
-    logger.debug("========== Firecracker create snapshot log ==========")
-    logger.debug(vm.log_data)
+    #logger.debug("========== Firecracker create snapshot log ==========")
+    #logger.debug(vm.log_data)
+    response = vm.machine_cfg.get()
+    assert vm.api_session.is_status_ok(response.status_code)
+    response_json = response.json()
+    logger.info(response_json)
     vm.kill()
     return snapshot
 
+import re
 
-
-def test_restore_snapshot_times(test_microvm_with_api):
+def test_restore_snapshot_times(bin_cloner_path, vcpu_cnt, mem_size):
     logger = logging.getLogger("restore_snapshot_times")
-    create_snapshot_helper(test_microvm_with_api, logger)
+
+    snapshot = create_snapshot_helper(bin_cloner_path, logger,
+                                drives=scratch_drives,
+                                ifaces=net_ifaces,
+                                vcpu_count = int(vcpu_cnt),
+                                mem_size_mib = int(mem_size))
+
+    for i in range(0,100):
+        builder = MicrovmBuilder(bin_cloner_path)
+        microvm, _ = builder.build_from_snapshot(snapshot,
+                                                    resume=True,
+                                                    enable_diff_snapshots=False)
+
+        #logger.info("========== Firecracker restore snapshot log ==========")
+        #logger.info(microvm.log_data)
+        LOG_LINE_REGEX = "-&%-.*-&%-"
+        matches = re.findall(LOG_LINE_REGEX, microvm.log_data)
+        for match in matches:
+            logger.info(match)
+        microvm.kill()

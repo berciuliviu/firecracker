@@ -6,6 +6,7 @@
 use std::io;
 use std::result::Result;
 use std::sync::{Arc, Mutex};
+use logger::info;
 
 use super::mmio::*;
 
@@ -328,7 +329,11 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 constructor_args.event_manager,
             )?;
             let new_now = std::time::Instant::now();
+<<<<<<< HEAD
             println!("Balloon Device Restore: {:?} us", new_now.duration_since(now).as_micros());
+=======
+            info!("-&%- Balloon-Device-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
+>>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
         }
 
         let now = std::time::Instant::now();
@@ -351,7 +356,11 @@ impl<'a> Persist<'a> for MMIODeviceManager {
             )?;
         }
         let new_now = std::time::Instant::now();
+<<<<<<< HEAD
         println!("Block Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
+=======
+        info!("-&%- Block-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
+>>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
         let now = std::time::Instant::now();
         for net_state in &state.net_devices {
@@ -373,7 +382,11 @@ impl<'a> Persist<'a> for MMIODeviceManager {
             )?;
         }
         let new_now = std::time::Instant::now();
+<<<<<<< HEAD
         println!("Net Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
+=======
+        info!("-&%- Net-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
+>>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
         if let Some(vsock_state) = &state.vsock_device {
             let ctor_args = VsockUdsConstructorArgs {

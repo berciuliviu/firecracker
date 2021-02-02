@@ -357,7 +357,7 @@ pub fn restore_from_snapshot(
     let now = std::time::Instant::now();
     let microvm_state = snapshot_state_from_file(&params.snapshot_path, version_map)?;
     let new_now = std::time::Instant::now();
-    println!("Snapshot State from File: {:?} us", new_now.duration_since(now).as_micros());
+    info!("Snapshot State from File: {:?} us", new_now.duration_since(now).as_micros());
 
     // Some sanity checks before building the microvm.
     snapshot_state_sanity_check(&microvm_state)?;
@@ -368,7 +368,7 @@ pub fn restore_from_snapshot(
         track_dirty_pages,
     )?;
     let new_now = std::time::Instant::now();
-    println!("Snapshot Memory from File: {:?} us", new_now.duration_since(now).as_micros());
+    info!("Snapshot Memory from File: {:?} us", new_now.duration_since(now).as_micros());
 
     let now = std::time::Instant::now();
     let res = builder::build_microvm_from_snapshot(
@@ -380,7 +380,7 @@ pub fn restore_from_snapshot(
     )
     .map_err(BuildMicroVm);
     let new_now = std::time::Instant::now();
-    println!("Build Microvm from Snapshot: {:?} us", new_now.duration_since(now).as_micros());
+    info!("Build Microvm from Snapshot: {:?} us", new_now.duration_since(now).as_micros());
     res
 }
 
