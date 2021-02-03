@@ -23,7 +23,7 @@ net_ifaces = [NetIfaceConfig(),
             ]
 
 # Define 3 scratch drives.
-scratch_drives = ["vdb", "vdc", "vdd"]
+scratch_drives = ["vdb", "vdc", "vdd"]# "vdd"]
 
 def create_snapshot_helper(bin_cloner_path, logger, target_version=None,
                            drives=None, ifaces=None,
@@ -127,14 +127,14 @@ def test_restore_snapshot_times(bin_cloner_path, vcpu_cnt, mem_size):
                                 vcpu_count = int(vcpu_cnt),
                                 mem_size_mib = int(mem_size))
 
-    for i in range(0,100):
+    for i in range(0,1):
         builder = MicrovmBuilder(bin_cloner_path)
         microvm, _ = builder.build_from_snapshot(snapshot,
                                                     resume=True,
                                                     enable_diff_snapshots=False)
 
         #logger.info("========== Firecracker restore snapshot log ==========")
-        #logger.info(microvm.log_data)
+        logger.info(microvm.log_data)
         LOG_LINE_REGEX = "-&%-.*-&%-"
         matches = re.findall(LOG_LINE_REGEX, microvm.log_data)
         for match in matches:

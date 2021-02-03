@@ -25,6 +25,7 @@ use kvm_ioctls::{Kvm, VmFd};
 use versionize::{VersionMap, Versionize, VersionizeResult};
 use versionize_derive::Versionize;
 use vm_memory::{Address, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
+use logger::info;
 
 /// Errors associated with the wrappers over KVM ioctls.
 #[derive(Debug)]
@@ -168,7 +169,11 @@ impl Vm {
         if guest_mem.num_regions() > kvm_max_memslots {
             return Err(Error::NotEnoughMemorySlots);
         }
+        let now = std::time::Instant::now();
+
         self.set_kvm_memory_regions(guest_mem, track_dirty_pages)?;
+        let new_now = std::time::Instant::now();
+        info!("-&%- MEMORY_INIT:set_kvm_memory_regions {:?} -&%-", new_now.duration_since(now).as_micros());
         #[cfg(target_arch = "x86_64")]
         self.fd
             .set_tss_address(arch::x86_64::layout::KVM_TSS_ADDRESS as usize)

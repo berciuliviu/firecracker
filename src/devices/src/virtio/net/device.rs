@@ -129,6 +129,8 @@ pub struct Net {
     pub(crate) mocks: Mocks,
 }
 
+use logger::info;
+
 impl Net {
     /// Create a new virtio network device with the given TAP interface.
     pub fn new_with_tap(
@@ -139,7 +141,10 @@ impl Net {
         tx_rate_limiter: RateLimiter,
         allow_mmds_requests: bool,
     ) -> Result<Self> {
+        let now = std::time::Instant::now();
         let tap = Tap::open_named(&tap_if_name).map_err(Error::TapOpen)?;
+        let new_now = std::time::Instant::now();
+        info!("-&%- Tap::open_named {:?} -&%-", new_now.duration_since(now).as_micros());
 
         // Set offload flags to match the virtio features below.
         tap.set_offload(
@@ -167,10 +172,14 @@ impl Net {
             avail_features |= 1 << VIRTIO_NET_F_MAC;
         }
 
+        let now = std::time::Instant::now();
         let mut queue_evts = Vec::new();
         for _ in QUEUE_SIZES.iter() {
             queue_evts.push(EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?);
         }
+        let new_now = std::time::Instant::now();
+        info!("-&%- Queue-Evts {:?} -&%-", new_now.duration_since(now).as_micros());
+
 
         let queues = QUEUE_SIZES.iter().map(|&s| Queue::new(s)).collect();
 
@@ -179,6 +188,14 @@ impl Net {
         } else {
             None
         };
+
+        let now = std::time::Instant::now();
+        let interrupt_evt = EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?;
+        let activate_evt = EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?;
+        let new_now = std::time::Instant::now();
+
+        info!("-&%- Interrupt-EVT {:?} -&%-", new_now.duration_since(now).as_micros());
+
         Ok(Net {
             id,
             tap,
@@ -195,9 +212,9 @@ impl Net {
             tx_frame_buf: [0u8; MAX_BUFFER_SIZE],
             tx_iovec: Vec::with_capacity(QUEUE_SIZE as usize),
             interrupt_status: Arc::new(AtomicUsize::new(0)),
-            interrupt_evt: EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?,
+            interrupt_evt: interrupt_evt,
             device_state: DeviceState::Inactive,
-            activate_evt: EventFd::new(libc::EFD_NONBLOCK).map_err(Error::EventFd)?,
+            activate_evt: activate_evt,
             config_space,
             mmds_ns,
             guest_mac: guest_mac.copied(),

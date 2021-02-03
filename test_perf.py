@@ -5,16 +5,16 @@ import json
 
 LOG_LINE_REGEX = "-&%-.*-&%-"
 CONFIGS = [
-    [2, 128],
-    [2, 256],
-    [2, 512],
-    [2, 1024],
-    [2, 1536],
-    [2, 3008],
+    # [2, 128],
+    # [2, 256],
+    # [2, 512],
+    # [2, 1024],
+    [1, 5307],
+    [2, 5307],
     [3, 5307],
-    [4, 7076],
-    [5, 8845],
-    [6, 10240],
+    # [4, 7076],
+    # [5, 8845],
+    # [6, 10240],
     ]
 
 # Create dictionary that tracks performance metrics
@@ -31,7 +31,10 @@ def parse_output(log, perf_dict):
         # print(match)
         parts = match.split(" ")
         # print(parts)
-        perf_dict[parts[1]].insert(0, int(parts[2]))
+        if (parts[1] not in perf_dict):
+            perf_dict[parts[1]] = [ int(parts[2]) ]
+        else:
+            perf_dict[parts[1]].insert(0, int(parts[2]))
 
 import numpy as np
 

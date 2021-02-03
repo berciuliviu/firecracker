@@ -329,11 +329,7 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 constructor_args.event_manager,
             )?;
             let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-            println!("Balloon Device Restore: {:?} us", new_now.duration_since(now).as_micros());
-=======
             info!("-&%- Balloon-Device-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
         }
 
         let now = std::time::Instant::now();
@@ -356,22 +352,27 @@ impl<'a> Persist<'a> for MMIODeviceManager {
             )?;
         }
         let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-        println!("Block Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
-=======
         info!("-&%- Block-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
         let now = std::time::Instant::now();
         for net_state in &state.net_devices {
-            let device = Arc::new(Mutex::new(
-                Net::restore(
-                    NetConstructorArgs { mem: mem.clone() },
-                    &net_state.device_state,
-                )
-                .map_err(Error::Net)?,
-            ));
 
+            let now = std::time::Instant::now();
+            let devi = Net::restore(
+                NetConstructorArgs { mem: mem.clone() },
+                &net_state.device_state,
+            )
+            .map_err(Error::Net)?;
+            let new_now = std::time::Instant::now();
+            info!("-&%- Net::Restore {:?} -&%-", new_now.duration_since(now).as_micros());
+
+            let now = std::time::Instant::now();
+            let device = Arc::new(Mutex::new(
+                devi,
+            ));
+            let new_now = std::time::Instant::now();
+            info!("-&%- Net-Restore-ARC_NEW {:?} -&%-", new_now.duration_since(now).as_micros());
+            let now = std::time::Instant::now();
             restore_helper(
                 device.clone(),
                 device,
@@ -380,13 +381,11 @@ impl<'a> Persist<'a> for MMIODeviceManager {
                 &net_state.mmio_slot,
                 constructor_args.event_manager,
             )?;
+            let new_now = std::time::Instant::now();
+            info!("-&%- Restore-Helper {:?} -&%-", new_now.duration_since(now).as_micros());
         }
         let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-        println!("Net Devices Restore: {:?} us", new_now.duration_since(now).as_micros());
-=======
         info!("-&%- Net-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
         if let Some(vsock_state) = &state.vsock_device {
             let ctor_args = VsockUdsConstructorArgs {

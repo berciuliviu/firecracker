@@ -38,6 +38,7 @@ pub struct NetState {
     config_space: NetConfigSpaceState,
     virtio_state: VirtioDeviceState,
 }
+use logger::info;
 
 pub struct NetConstructorArgs {
     pub mem: GuestMemoryMmap,
@@ -74,10 +75,17 @@ impl Persist<'_> for Net {
         state: &Self::State,
     ) -> std::result::Result<Self, Self::Error> {
         // RateLimiter::restore() can fail at creating a timerfd.
+        let now = std::time::Instant::now();
         let rx_rate_limiter = RateLimiter::restore((), &state.rx_rate_limiter_state)
             .map_err(Error::CreateRateLimiter)?;
         let tx_rate_limiter = RateLimiter::restore((), &state.tx_rate_limiter_state)
             .map_err(Error::CreateRateLimiter)?;
+
+        let new_now = std::time::Instant::now();
+        info!("-&%- RESTORE::RateLimiter {:?} -&%-", new_now.duration_since(now).as_micros());
+
+        let now = std::time::Instant::now();
+
         let mut net = Net::new_with_tap(
             state.id.clone(),
             state.tap_if_name.clone(),
@@ -87,17 +95,20 @@ impl Persist<'_> for Net {
             state.mmds_ns.is_some(),
         )
         .map_err(Error::CreateNet)?;
+        let new_now = std::time::Instant::now();
+        info!("-&%- RESTORE::New-With-Tap {:?} -&%-", new_now.duration_since(now).as_micros());
+        let now = std::time::Instant::now();
 
         // Safe to unwrap because MmdsNetworkStack::restore() cannot fail.
         net.mmds_ns = state
-            .mmds_ns
-            .as_ref()
-            .map(|mmds_state| MmdsNetworkStack::restore((), &mmds_state).unwrap());
+        .mmds_ns
+        .as_ref()
+        .map(|mmds_state| MmdsNetworkStack::restore((), &mmds_state).unwrap());
 
         net.queues = state
-            .virtio_state
-            .build_queues_checked(&constructor_args.mem, TYPE_NET, NUM_QUEUES, QUEUE_SIZE)
-            .map_err(Error::VirtioState)?;
+        .virtio_state
+        .build_queues_checked(&constructor_args.mem, TYPE_NET, NUM_QUEUES, QUEUE_SIZE)
+        .map_err(Error::VirtioState)?;
         net.interrupt_status = Arc::new(AtomicUsize::new(state.virtio_state.interrupt_status));
         net.avail_features = state.virtio_state.avail_features;
         net.acked_features = state.virtio_state.acked_features;
@@ -113,7 +124,10 @@ impl Persist<'_> for Net {
             net.device_state = DeviceState::Activated(constructor_args.mem);
         }
 
-        Ok(net)
+        let res = Ok(net);
+        let new_now = std::time::Instant::now();
+        info!("-&%- RESTORE::body {:?} -&%-", new_now.duration_since(now).as_micros());
+        res
     }
 }
 

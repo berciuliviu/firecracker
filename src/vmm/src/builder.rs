@@ -212,8 +212,11 @@ fn create_vmm_and_vcpus(
 ) -> std::result::Result<(Vmm, Vec<Vcpu>), StartMicrovmError> {
     use self::StartMicrovmError::*;
 
+    let now = std::time::Instant::now();
     // Set up Kvm Vm and register memory regions.
     let mut vm = setup_kvm_vm(&guest_memory, track_dirty_pages)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- Setup-KVM-VM {:?} -&%-", new_now.duration_since(now).as_micros());
 
     // Vmm exit event.
     let exit_evt = EventFd::new(libc::EFD_NONBLOCK)
@@ -226,6 +229,7 @@ fn create_vmm_and_vcpus(
     let mmio_device_manager =
         MMIODeviceManager::new(arch::MMIO_MEM_START, (arch::IRQ_BASE, arch::IRQ_MAX));
 
+    let now = std::time::Instant::now();
     let vcpus;
     // For x86_64 we need to create the interrupt controller before calling `KVM_CREATE_VCPUS`
     // while on aarch64 we need to do it the other way around.
@@ -249,6 +253,9 @@ fn create_vmm_and_vcpus(
         create_pio_dev_manager_with_legacy_devices(&vm, serial_device, reset_evt)
             .map_err(Internal)?
     };
+
+    let new_now = std::time::Instant::now();
+    info!("-&%- Create-Interrupt-Controller {:?} -&%-", new_now.duration_since(now).as_micros());
 
     // On aarch64, the vCPUs need to be created (i.e call KVM_CREATE_VCPU) before setting up the
     // IRQ chip because the `KVM_CREATE_VCPU` ioctl will return error if the IRQCHIP
@@ -400,11 +407,7 @@ pub fn build_microvm_from_snapshot(
         vcpu_count,
     )?;
     let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-    println!("Create VMM and VCPUs: {:?} us", new_now.duration_since(now).as_micros());
-=======
     info!("-&%- Create-Vmm-Vcpus-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
     #[cfg(target_arch = "aarch64")]
     {
@@ -424,11 +427,7 @@ pub fn build_microvm_from_snapshot(
         .map_err(MicrovmStateError::RestoreVmState)
         .map_err(RestoreMicrovmState)?;
     let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-    println!("Restore KVM VM state: {:?} us", new_now.duration_since(now).as_micros());
-=======
     info!("-&%- KVM-State-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
     // Restore devices states.
     let mmio_ctor_args = MMIODevManagerConstructorArgs {
@@ -442,21 +441,13 @@ pub fn build_microvm_from_snapshot(
             .map_err(MicrovmStateError::RestoreDevices)
             .map_err(RestoreMicrovmState)?;
     let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-    println!("MMIODeviceManager::Restore: {:?} us", new_now.duration_since(now).as_micros());
-=======
     info!("-&%- MMIO-Devices-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
     let now = std::time::Instant::now();
     vmm.start_vcpus(vcpus, seccomp_filter)
         .map_err(StartMicrovmError::Internal)?;
     let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-    println!("Start VCPUs: {:?} us", new_now.duration_since(now).as_micros());
-=======
     info!("-&%- VCPUs-Start {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
     // Move vcpus to their own threads and start their state machine in the 'Paused' state.
 
     let now = std::time::Instant::now();
@@ -464,11 +455,7 @@ pub fn build_microvm_from_snapshot(
     vmm.restore_vcpu_states(microvm_state.vcpu_states)
     .map_err(RestoreMicrovmState)?;
     let new_now = std::time::Instant::now();
-<<<<<<< HEAD
-    println!("VCPU States Restore: {:?} us", new_now.duration_since(now).as_micros());
-=======
     info!("-&%- VCPUs-State-Restore {:?} -&%-", new_now.duration_since(now).as_micros());
->>>>>>> ddef2fa0ea60cecaabb4effb3242305074d40e2b
 
     let vmm = Arc::new(Mutex::new(vmm));
     event_manager
@@ -578,13 +565,24 @@ pub(crate) fn setup_kvm_vm(
     track_dirty_pages: bool,
 ) -> std::result::Result<Vm, StartMicrovmError> {
     use self::StartMicrovmError::Internal;
+    let now = std::time::Instant::now();
     let kvm = KvmContext::new()
         .map_err(Error::KvmContext)
         .map_err(Internal)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- KvmContext::new {:?} -&%-", new_now.duration_since(now).as_micros());
+
+    let now = std::time::Instant::now();
     let mut vm = Vm::new(kvm.fd()).map_err(Error::Vm).map_err(Internal)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- Vm::new {:?} -&%-", new_now.duration_since(now).as_micros());
+
+    let now = std::time::Instant::now();
     vm.memory_init(&guest_memory, kvm.max_memslots(), track_dirty_pages)
         .map_err(Error::Vm)
         .map_err(Internal)?;
+    let new_now = std::time::Instant::now();
+    info!("-&%- Vm.memory_init {:?} -&%-", new_now.duration_since(now).as_micros());
     Ok(vm)
 }
 

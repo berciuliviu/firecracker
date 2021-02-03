@@ -58,6 +58,7 @@ pub struct RateLimiterState {
     ops: Option<TokenBucketState>,
     bandwidth: Option<TokenBucketState>,
 }
+use logger::info;
 
 impl Persist<'_> for RateLimiter {
     type State = RateLimiterState;
@@ -72,6 +73,12 @@ impl Persist<'_> for RateLimiter {
     }
 
     fn restore(_: Self::ConstructorArgs, state: &Self::State) -> Result<Self, Self::Error> {
+
+        let now = std::time::Instant::now();
+        let timer_fd = TimerFd::new_custom(ClockId::Monotonic, true, true)?;
+        let new_now = std::time::Instant::now();
+        info!("-&%- TimerFD-new_custom {:?} -&%-", new_now.duration_since(now).as_micros());
+
         let rate_limiter = RateLimiter {
             ops: if let Some(ops) = state.ops.as_ref() {
                 Some(TokenBucket::restore((), ops)?)
@@ -83,7 +90,7 @@ impl Persist<'_> for RateLimiter {
             } else {
                 None
             },
-            timer_fd: TimerFd::new_custom(ClockId::Monotonic, true, true)?,
+            timer_fd: timer_fd,
             timer_active: false,
         };
 
